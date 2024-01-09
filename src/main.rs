@@ -6,7 +6,7 @@ use axum::{
     middleware::{Next, from_fn_with_state}, Extension,
 };
 use axum_macros::debug_handler;
-use redis::aio::ConnectionManager;
+use redis::{aio::ConnectionManager, ToRedisArgs};
 use serde::Deserialize;
 use std::net::SocketAddr;
 use tower_http::compression::CompressionLayer;
@@ -76,7 +76,7 @@ async fn get_key(
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
     tracing::info!("{}", key);
-    if let Ok(resp) = conn.send_packed_command(redis::cmd("GET").arg(key)).await {
+    if let Ok(resp) = conn.send_packed_command(redis::cmd("GET").arg(key.to_redis_args())).await {
         match resp {
             redis::Value::Nil => return (StatusCode::NOT_FOUND, Json("Key not found".to_string())),
             redis::Value::Data(str) => {
@@ -96,7 +96,7 @@ async fn post_value(
     Json(payload): Json<SetValue>,
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
-    match conn.send_packed_command(redis::cmd("SET").arg(key).arg(payload.value)).await {
+    match conn.send_packed_command(redis::cmd("SET").arg(key.to_redis_args()).arg(payload.value.to_redis_args())).await {
         Ok(_) => return (StatusCode::OK, Json("Ok".to_string())),
         Err(err) => {
             tracing::error!("Failed to set key: {}", err);
@@ -112,7 +112,7 @@ async fn delete_key(
     Path(key): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
-    match conn.send_packed_command(redis::cmd("DEL").arg(key)).await {
+    match conn.send_packed_command(redis::cmd("DEL").arg(key.to_redis_args())).await {
         Ok(redis::Value::Okay) => return (StatusCode::OK, Json("Ok".to_string())),
         Ok(_) => return (StatusCode::OK, Json("OK".to_string())),
         Err(err) => {
@@ -131,7 +131,7 @@ async fn get_prefix_by_token<B>(
     if let Some(authorize_header) = headers.get(header::AUTHORIZATION) {
         let token: String = authorize_header.to_str().unwrap_or("").split(" ").last().unwrap_or("").to_string();
         tracing::debug!("Token: {}", token);
-        match conn.send_packed_command(redis::cmd("SISMEMBER").arg(REDIS_TOKENS_TABLE).arg(&token)).await {
+        match conn.send_packed_command(redis::cmd("SISMEMBER").arg(REDIS_TOKENS_TABLE.to_redis_args()).arg(&token.to_redis_args())).await {
             Ok(redis::Value::Int(n)) if n == 1 => {
                 let mut request = request;
                 request.extensions_mut().insert(token);
