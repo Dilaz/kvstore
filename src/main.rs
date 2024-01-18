@@ -27,7 +27,9 @@ async fn main() {
         .init();
 
     tracing::info!("Creating redis client..");
-    let client = match redis::Client::open("redis://127.0.0.1:6379") {
+
+    // Get client url from env
+    let client = match redis::Client::open(std::env::var("REDIS_URL").unwrap_or("redis://127.0.0.1:6379".to_string())) {
         Ok(client) => client,
         Err(e) => {
             tracing::error!("Failed to connect to redis: {}", e);

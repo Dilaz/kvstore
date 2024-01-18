@@ -1,0 +1,24 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kvstore
+  namespace: kvstore
+  labels:
+    app: kvstore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kvstore
+  template:
+    metadata:
+      labels:
+        app: kvstore
+    spec:
+      containers:
+      - name: kvstore
+        imagePullPolicy: Always
+        envFrom:
+          - secretRef:
+              name: kvstore-secrets
