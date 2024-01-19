@@ -43,6 +43,7 @@ jobs:
   deploy:
     name: Deploy
     needs: build_and_test
+    secrets: inherit
     runs-on: ubuntu-latest
     steps:
       - name: Set the Kubernetes context
