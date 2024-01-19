@@ -44,7 +44,6 @@ jobs:
     name: Deploy
     needs: build_and_test
     runs-on: ubuntu-latest
-    secrets: inherit
     steps:
       - name: Set the Kubernetes context
         uses: azure/k8s-set-context@v2
