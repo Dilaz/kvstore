@@ -1,4 +1,4 @@
-FROM messense/rust-musl-cross:x86_64-musl AS builder
+FROM messense/rust-musl-cross:armv7-musleabihf AS builder
 WORKDIR /kvstore
 COPY . .
 RUN cargo build --release --target armv7-unknown-linux-musleabihf
