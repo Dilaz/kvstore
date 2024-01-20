@@ -8,11 +8,12 @@ use axum::{
 use axum_macros::debug_handler;
 use redis::{aio::ConnectionManager, ToRedisArgs};
 use serde::Deserialize;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, Ipv4Addr};
 use tower_http::compression::CompressionLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 const REDIS_TOKENS_TABLE: &str = "tokens";
+const PORT: u16 = 3000;
 
 #[tokio::main]
 async fn main() {
@@ -61,7 +62,7 @@ async fn main() {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = ":::3000".parse::<SocketAddr>().unwrap();
+    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, PORT));
     tracing::debug!("listening on {}", addr);
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
