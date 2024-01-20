@@ -39,6 +39,8 @@ jobs:
           tags: |
             ghcr.io/dilaz/kvstore:latest
             ghcr.io/dilaz/kvstore:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy

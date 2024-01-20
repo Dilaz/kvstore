@@ -18,6 +18,7 @@ spec:
     spec:
       containers:
       - name: kvstore
+        image: ghcr.io/dilaz/kvstore:latest
         imagePullPolicy: Always
         envFrom:
           - secretRef:
