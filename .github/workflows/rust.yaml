@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -51,7 +51,7 @@ jobs:
         uses: azure/k8s-set-context@v2
         with:
           method: service-account
-          k8s-url: https://129.151.219.207:6443
+          k8s-url: ${{ secrets.KUBERNETES_HOST }}
           k8s-secret: ${{ secrets.KUBERNETES_SECRET }}
       - name: Checkout source code
         uses: actions/checkout@v3

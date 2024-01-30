@@ -1,9 +1,5 @@
 use axum::{
-    extract::{Path, State},
-    http::{StatusCode, HeaderMap, header, Request},
-    routing::get,
-    Json, Router, response::Response,
-    middleware::{Next, from_fn_with_state}, Extension,
+    extract::{Path, State}, http::{StatusCode, HeaderMap, header, Request}, middleware::{Next, from_fn_with_state}, response::Response, routing::get, Extension, Json, Router
 };
 use axum_macros::debug_handler;
 use redis::{aio::ConnectionManager, ToRedisArgs};
@@ -51,12 +47,13 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
+        .route("/healthz", get(healthcheck))
         .route("/:key",
             get(get_key)
             .post(post_value)
             .delete(delete_key)
+            .layer(from_fn_with_state(connection_manager.clone(), get_prefix_by_token))
         )
-        .layer(from_fn_with_state(connection_manager.clone(), get_prefix_by_token))
         .layer(CompressionLayer::new())
         .with_state(connection_manager);
 
@@ -120,6 +117,20 @@ async fn delete_key(
         Ok(_) => return (StatusCode::OK, Json("OK".to_string())),
         Err(err) => {
             tracing::error!("Failed to set key: {}", err);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()));
+        },
+    }
+}
+
+async fn healthcheck(State(mut conn): State<ConnectionManager>) -> (StatusCode, Json<String>) {
+    match conn.send_packed_command(&redis::cmd("PING")).await {
+        Ok(redis::Value::Status(val)) if val == "PONG" => return (StatusCode::OK, Json("Ok".to_string())),
+        Ok(value) => { 
+            tracing::error!("Status check failed: {:?}", value);
+            return (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()))
+        },
+        Err(err) => {
+            tracing::error!("Status check failed: {}", err);
             return (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()));
         },
     }

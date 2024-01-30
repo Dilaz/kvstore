@@ -7,7 +7,12 @@ metadata:
   labels:
     app: kvstore
 spec:
-  replicas: 1
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
   selector:
     matchLabels:
       app: kvstore
@@ -20,6 +25,28 @@ spec:
       - name: kvstore
         image: ghcr.io/dilaz/kvstore:latest
         imagePullPolicy: Always
+        ports:
+          - containerPort: 3000
+            protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 3000
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 5m
+          limits:
+            memory: 100Mi
+            cpu: 15m
         envFrom:
           - secretRef:
               name: kvstore-secrets
