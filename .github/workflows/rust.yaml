@@ -39,20 +39,20 @@ jobs:
         with:
           push: true
           platforms: linux/amd64,linux/arm/v7,linux/arm64
-          tags: ghcr.io/dilaz/kvstore:${{ github.sha }}
+          tags: ghcr.io/dilaz/kvstore:${{ github.sha }},ghcr.io/dilaz/kvstore:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Optimize the Docker image with Slim Toolkit
-        uses: kitabisa/docker-slim-action@v1
-        env:
-          DSLIM_HTTP_PROBE: false
-        with:
-          target: ghcr.io/dilaz/kvstore:${{ github.sha }}
-          tag: latest
-      - name: Push Docker image
-        run: |
-          docker tag ghcr.io/dilaz/kvstore:latest ghcr.io/dilaz/kvstore:${{ github.sha }}
-          docker push ghcr.io/dilaz/kvstore --all-tags
+      # - name: Optimize the Docker image with Slim Toolkit
+      #   uses: kitabisa/docker-slim-action@v1
+      #   env:
+      #     DSLIM_HTTP_PROBE: false
+      #   with:
+      #     target: ghcr.io/dilaz/kvstore:${{ github.sha }}
+      #     tag: latest
+      # - name: Push Docker image
+      #   run: |
+      #     docker tag ghcr.io/dilaz/kvstore:latest ghcr.io/dilaz/kvstore:${{ github.sha }}
+      #     docker push ghcr.io/dilaz/kvstore --all-tags
   deploy:
     name: Deploy
     needs: build_and_test
