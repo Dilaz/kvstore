@@ -44,6 +44,8 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Optimize the Docker image with Slim Toolkit
         uses: kitabisa/docker-slim-action@v1
+        env:
+          DSLIM_HTTP_PROBE: false
         with:
           target: ghcr.io/dilaz/kvstore:${{ github.sha }}
           tag: latest
