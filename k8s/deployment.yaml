@@ -25,6 +25,13 @@ spec:
       - name: kvstore
         image: ghcr.io/dilaz/kvstore:latest
         imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          runAsUser: 10000
+          capabilities:
+            drop: [ALL]
         ports:
           - containerPort: 3000
             protocol: TCP
