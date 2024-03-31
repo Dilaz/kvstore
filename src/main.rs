@@ -45,17 +45,7 @@ async fn main() {
     let connection_manager = connection_manager.unwrap();
 
     // build our application with a route
-    let app = Router::new()
-        // `GET /` goes to `root`
-        .route("/healthz", get(healthcheck))
-        .route("/:key",
-            get(get_key)
-            .post(post_value)
-            .delete(delete_key)
-            .layer(from_fn_with_state(connection_manager.clone(), get_prefix_by_token))
-        )
-        .layer(CompressionLayer::new())
-        .with_state(connection_manager);
+    let app = app(&connection_manager);
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -67,6 +57,20 @@ async fn main() {
         .unwrap();
 }
 
+fn app(connection_manager: &ConnectionManager) -> Router {
+    return Router::new()
+    // `GET /` goes to `root`
+    .route("/healthz", get(healthcheck))
+    .route("/:key",
+        get(get_key)
+        .post(post_value)
+        .delete(delete_key)
+        .layer(from_fn_with_state(connection_manager.clone(), get_prefix_by_token))
+    )
+    .layer(CompressionLayer::new())
+    .with_state(connection_manager.clone());
+}
+
 // basic handler that responds with a static string
 #[debug_handler]
 async fn get_key(
@@ -75,7 +79,7 @@ async fn get_key(
     Path(key): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
-    tracing::info!("{}", key);
+    tracing::info!("GET {}", key);
     if let Ok(resp) = conn.send_packed_command(redis::cmd("GET").arg(key.to_redis_args())).await {
         match resp {
             redis::Value::Nil => return (StatusCode::NOT_FOUND, Json("Key not found".to_string())),
@@ -96,6 +100,7 @@ async fn post_value(
     Json(payload): Json<SetValue>,
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
+    tracing::info!("SET {}", key);
     match conn.send_packed_command(redis::cmd("SET").arg(key.to_redis_args()).arg(payload.value.to_redis_args())).await {
         Ok(_) => return (StatusCode::OK, Json("Ok".to_string())),
         Err(err) => {
@@ -112,6 +117,7 @@ async fn delete_key(
     Path(key): Path<String>,
 ) -> (StatusCode, Json<String>) {
     let key = format!("{}:{}", ext, key);
+    tracing::info!("DELETE {}", key);
     match conn.send_packed_command(redis::cmd("DEL").arg(key.to_redis_args())).await {
         Ok(redis::Value::Okay) => return (StatusCode::OK, Json("Ok".to_string())),
         Ok(_) => return (StatusCode::OK, Json("OK".to_string())),
@@ -144,7 +150,6 @@ async fn get_prefix_by_token<B>(
 ) -> Result<Response, StatusCode> {
     if let Some(authorize_header) = headers.get(header::AUTHORIZATION) {
         let token: String = authorize_header.to_str().unwrap_or("").split(" ").last().unwrap_or("").to_string();
-        tracing::debug!("Token: {}", token);
         match conn.send_packed_command(redis::cmd("SISMEMBER").arg(REDIS_TOKENS_TABLE.to_redis_args()).arg(&token.to_redis_args())).await {
             Ok(redis::Value::Int(n)) if n == 1 => {
                 let mut request = request;

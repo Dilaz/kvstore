@@ -79,3 +79,18 @@ jobs:
             k8s/service.yaml
           images: |
             ghcr.io/dilaz/kvstore:${{ github.sha }}
+  rollback:
+    if: failure()
+    name: Rollback
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set the Kubernetes context
+        uses: azure/k8s-set-context@v2
+        with:
+          method: service-account
+          k8s-url: ${{ secrets.KUBERNETES_HOST }}
+          k8s-secret: ${{ secrets.KUBERNETES_SECRET }}
+      - name: Rollback
+        run: |
+          kubectl rollout undo deployment kvstore-deployment -n kvstore
