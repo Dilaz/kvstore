@@ -98,6 +98,7 @@ async fn get_key(
         match resp {
             redis::Value::Nil => (StatusCode::NOT_FOUND, Json("Key not found".to_string())),
             redis::Value::SimpleString(str) => (StatusCode::OK, Json(str.to_string())),
+            redis::Value::BulkString(str) => (StatusCode::OK, Json(String::from_utf8(str).unwrap())),
             _ => (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string())),
         }
     } else {
