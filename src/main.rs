@@ -75,7 +75,7 @@ fn app(connection_manager: &ConnectionManager) -> Router {
     Router::new()
     // `GET /` goes to `root`
     .route("/healthz", get(healthcheck))
-    .route("/:key",
+    .route("/{:key}",
         get(get_key)
         .post(post_value)
         .delete(delete_key)

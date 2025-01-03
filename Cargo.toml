@@ -6,12 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = "0.7.9"
-axum-macros = "0.4.2"
+axum = "0.8.1"
+axum-macros = "0.5.0"
 redis = { version = "0.27.6", features = ["tokio", "r2d2", "connection-manager", "aio", "tokio-comp"] }
-serde = { version = "1.0.216", features = ["derive"] }
-serde_json = "1.0.133"
-thiserror = "2.0.8"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.134"
+thiserror = "2.0.9"
 tokio = { version = "1.42.0", features = ["full"] }
 tower = { version = "0.5.2", features = ["util", "timeout", "load-shed", "limit", "tokio"] }
 tower-http = { version = "0.6.2", features = ["add-extension", "auth", "compression-full", "limit", "trace"] }
