@@ -1,184 +1,115 @@
-use axum::{
-    extract::{Path, State}, http::{StatusCode, HeaderMap, header, Request}, middleware::{Next, from_fn_with_state}, response::Response, routing::get, Extension, Json, Router
-};
-use axum_macros::debug_handler;
-use redis::{aio::ConnectionManager, ToRedisArgs};
-use serde::Deserialize;
-use thiserror::Error;
-use std::net::{SocketAddr, Ipv4Addr};
-use tower_http::compression::CompressionLayer;
+//! KVStore Server
+//!
+//! A production-ready key-value storage server with HTTP and gRPC support.
+//!
+//! ## Environment Variables
+//!
+//! - `REDIS_URL`: Redis connection URL (default: "redis://127.0.0.1:6379")
+//! - `HTTP_PORT`: HTTP server port (default: 3000)
+//! - `GRPC_PORT`: gRPC server port (default: 50051)
+//! - `ENABLE_HTTP`: Enable HTTP server (default: true)
+//! - `ENABLE_GRPC`: Enable gRPC server (default: true)
+//! - `RUST_LOG`: Logging level (default: "kvstore=info,tower_http=info")
+
+use kvstore::{create_grpc_server, create_http_server, KVStore};
+use std::net::{Ipv4Addr, SocketAddr};
+use tonic::transport::Server;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-const REDIS_TOKENS_TABLE: &str = "tokens";
-const PORT: u16 = 3000;
-
-#[derive(Debug, Error)]
-enum KVStoreError {
-    #[error(transparent)]
-    RedisError(#[from] redis::RedisError),
-    #[error(transparent)]
-    IoError(#[from] std::io::Error),
-}
-
 #[tokio::main]
-async fn main() -> Result<(), KVStoreError> {
-    tracing::info!("Starting!");
-    // initialize tracing
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Initialize tracing
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "kvstore=debug,tower_http=debug".into()),
+                .unwrap_or_else(|_| "kvstore=info,tower_http=info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    tracing::info!("Creating redis client..");
+    tracing::info!("Starting KVStore server");
 
-    // Get client url from env
-    let client = match redis::Client::open(std::env::var("REDIS_URL").unwrap_or("redis://127.0.0.1:6379".to_string())) {
-        Ok(client) => client,
-        Err(err) => {
-            tracing::error!("Failed to connect to redis: {}", err);
-            return Err(KVStoreError::RedisError(err));
-        }
-    };
+    // Get configuration from environment
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let http_port: u16 = std::env::var("HTTP_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(kvstore::DEFAULT_HTTP_PORT);
+    let grpc_port: u16 = std::env::var("GRPC_PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(kvstore::DEFAULT_GRPC_PORT);
+    let enable_http = std::env::var("ENABLE_HTTP")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(true);
+    let enable_grpc = std::env::var("ENABLE_GRPC")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(true);
 
-    tracing::info!("Creating connection manager..");
-    let connection_manager = ConnectionManager::new(client).await;
+    // Create KVStore instance
+    tracing::info!("Connecting to Redis at {}", redis_url);
+    let store = KVStore::new(&redis_url).await?;
+    tracing::info!("Successfully connected to Redis");
 
-    if let Err(err) = connection_manager {
-        tracing::error!("Failed to connect to redis: {}", err);
-        return Err(KVStoreError::RedisError(err));
+    // Verify health
+    if !store.health_check().await? {
+        tracing::error!("Redis health check failed");
+        return Err("Redis connection unhealthy".into());
     }
 
-    let connection_manager = connection_manager.unwrap();
+    let mut handles = vec![];
 
-    // build our application with a route
-    let app = app(&connection_manager);
+    // Start HTTP server
+    if enable_http {
+        let store_clone = store.clone();
+        let http_handle = tokio::spawn(async move {
+            let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, http_port));
+            tracing::info!("Starting HTTP server on {}", addr);
 
-    // run our app with hyper
-    // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, PORT));
-    tracing::debug!("listening on {}", addr);
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+            let app = create_http_server(store_clone);
+            let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    match axum::serve(listener, app).await {
-        Ok(_) => Ok(()),
-        Err(err) => {
-            tracing::error!("Failed to start server: {}", err);
-            Err(KVStoreError::IoError(err))
-        }
+            axum::serve(listener, app).await?;
+
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
+        });
+        handles.push(http_handle);
     }
-}
 
-fn app(connection_manager: &ConnectionManager) -> Router {
-    Router::new()
-    // `GET /` goes to `root`
-    .route("/healthz", get(healthcheck))
-    .route("/{:key}",
-        get(get_key)
-        .post(post_value)
-        .delete(delete_key)
-        .layer(from_fn_with_state(connection_manager.clone(), get_prefix_by_token))
-    )
-    .layer(CompressionLayer::new())
-    .with_state(connection_manager.clone())
-}
+    // Start gRPC server
+    if enable_grpc {
+        let store_clone = store.clone();
+        let grpc_handle = tokio::spawn(async move {
+            let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, grpc_port));
+            tracing::info!("Starting gRPC server on {}", addr);
 
-// basic handler that responds with a static string
-#[debug_handler]
-async fn get_key(
-    Extension(ext): Extension<String>,
-    State(mut conn): State<ConnectionManager>,
-    Path(key): Path<String>,
-) -> (StatusCode, Json<String>) {
-    let key = format!("{}:{}", ext, key);
-    tracing::info!("GET {}", key);
-    if let Ok(resp) = conn.send_packed_command(redis::cmd("GET").arg(key.to_redis_args())).await {
-        match resp {
-            redis::Value::Nil => (StatusCode::NOT_FOUND, Json("Key not found".to_string())),
-            redis::Value::SimpleString(str) => (StatusCode::OK, Json(str.to_string())),
-            redis::Value::BulkString(str) => (StatusCode::OK, Json(String::from_utf8(str).unwrap())),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string())),
-        }
-    } else {
-        (StatusCode::NOT_FOUND, Json("Key not found".to_string()))
+            let service = create_grpc_server(store_clone);
+
+            Server::builder()
+                .add_service(service)
+                .serve(addr)
+                .await?;
+
+            Ok::<_, Box<dyn std::error::Error + Send + Sync>>(())
+        });
+        handles.push(grpc_handle);
     }
-}
 
-async fn post_value(
-    Extension(ext): Extension<String>,
-    State(mut conn): State<ConnectionManager>,
-    Path(key): Path<String>,
-    Json(payload): Json<SetValue>,
-) -> (StatusCode, Json<String>) {
-    let key = format!("{}:{}", ext, key);
-    tracing::info!("SET {}", key);
-    match conn.send_packed_command(redis::cmd("SET").arg(key.to_redis_args()).arg(payload.value.to_redis_args())).await {
-        Ok(_) => (StatusCode::OK, Json("Ok".to_string())),
-        Err(err) => {
-            tracing::error!("Failed to set key: {}", err);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()))
-        },
-
+    if handles.is_empty() {
+        tracing::error!("No servers enabled. Set ENABLE_HTTP or ENABLE_GRPC to true.");
+        return Err("No servers enabled".into());
     }
-}
 
-async fn delete_key(
-    Extension(ext): Extension<String>,
-    State(mut conn): State<ConnectionManager>,
-    Path(key): Path<String>,
-) -> (StatusCode, Json<String>) {
-    let key = format!("{}:{}", ext, key);
-    tracing::info!("DELETE {}", key);
-    match conn.send_packed_command(redis::cmd("DEL").arg(key.to_redis_args())).await {
-        Ok(redis::Value::Okay) => (StatusCode::OK, Json("Ok".to_string())),
-        Ok(_) => (StatusCode::OK, Json("OK".to_string())),
-        Err(err) => {
-            tracing::error!("Failed to set key: {}", err);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()))
-        },
-    }
-}
-
-async fn healthcheck(State(mut conn): State<ConnectionManager>) -> (StatusCode, Json<String>) {
-    match conn.send_packed_command(&redis::cmd("PING")).await {
-        Ok(redis::Value::SimpleString(str)) if str == "PONG" => (StatusCode::OK, Json("Ok".to_string())),
-        Ok(value) => { 
-            tracing::error!("Status check failed: {:?}", value);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()))
-        },
-        Err(err) => {
-            tracing::error!("Status check failed: {}", err);
-            (StatusCode::INTERNAL_SERVER_ERROR, Json("Internal Server Error".to_string()))
-        },
-    }
-}
-
-async fn get_prefix_by_token(
-    State(mut conn): State<ConnectionManager>,
-    headers: HeaderMap,
-    request: Request<axum::body::Body>,
-    next: Next,
-) -> Result<Response, StatusCode> {
-    if let Some(authorize_header) = headers.get(header::AUTHORIZATION) {
-        let token: String = authorize_header.to_str().unwrap_or("").split(" ").last().unwrap_or("").to_string();
-        match conn.send_packed_command(redis::cmd("SISMEMBER").arg(REDIS_TOKENS_TABLE.to_redis_args()).arg(token.to_redis_args())).await {
-            Ok(redis::Value::Int(1)) => {
-                let mut request = request;
-                request.extensions_mut().insert(token);
-                return Ok(next.run(request).await)
-            },
-            Ok(_) => return Err(StatusCode::UNAUTHORIZED),
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+    // Wait for all servers
+    for handle in handles {
+        if let Err(e) = handle.await? {
+            tracing::error!("Server error: {}", e);
+            return Err(e);
         }
     }
 
-    Err(StatusCode::UNAUTHORIZED)
-}
-
-
-#[derive(Debug, Deserialize)]
-struct SetValue {
-    value: String,
+    Ok(())
 }
