@@ -1,19 +1,60 @@
 [package]
 name = "kvstore"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+authors = ["KVStore Contributors"]
+description = "A lightweight, production-ready Rust library for key-value storage with HTTP and gRPC support, backed by Redis"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/kvstore"
+keywords = ["kvstore", "redis", "grpc", "http", "api"]
+categories = ["web-programming", "api-bindings", "database"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+name = "kvstore"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kvstore"
+path = "src/main.rs"
+
 [dependencies]
-axum = "0.8.1"
+# Web framework
+axum = "0.8.6"
 axum-macros = "0.5.0"
+
+# gRPC support
+tonic = "0.12.3"
+prost = "0.13.3"
+tokio-stream = { version = "0.1.17", features = ["net"] }
+
+# Redis client
 redis = { version = "0.27.6", features = ["tokio", "r2d2", "connection-manager", "aio", "tokio-comp"] }
+
+# Serialization
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.134"
+
+# Error handling
 thiserror = "2.0.9"
+anyhow = "1.0.95"
+
+# Async runtime
 tokio = { version = "1.42.0", features = ["full"] }
+
+# Middleware
 tower = { version = "0.5.2", features = ["util", "timeout", "load-shed", "limit", "tokio"] }
 tower-http = { version = "0.6.2", features = ["add-extension", "auth", "compression-full", "limit", "trace"] }
+
+# Logging
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+[build-dependencies]
+tonic-build = "0.12.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.13.1"
+tempfile = "3.14.0"
