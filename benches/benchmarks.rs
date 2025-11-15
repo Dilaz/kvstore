@@ -157,22 +157,24 @@ fn server_benchmarks(c: &mut Criterion) {
     let grpc_key = "grpc_key".to_string();
     let grpc_value = "grpc_value".to_string();
 
-    grpc_group.bench_function("set", |b| {
-        let mut client = rt.block_on(async {
-            let mut attempts = 0;
-            loop {
-                match connect(&endpoint).await {
-                    Ok(client) => break client,
-                    Err(e) => {
-                        attempts += 1;
-                        if attempts > 20 {
-                            panic!("connect gRPC client: {e}");
-                        }
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+    let client = rt.block_on(async {
+        let mut attempts = 0;
+        loop {
+            match connect(&endpoint).await {
+                Ok(client) => break client,
+                Err(e) => {
+                    attempts += 1;
+                    if attempts > 20 {
+                        panic!("connect gRPC client: {e}");
                     }
+                    tokio::time::sleep(Duration::from_millis(100)).await;
                 }
             }
-        });
+        }
+    });
+
+    grpc_group.bench_function("set", |b| {
+        let mut client = client.clone();
         let key = grpc_key.clone();
         let value = grpc_value.clone();
         let bearer = token.to_string();
@@ -190,21 +192,7 @@ fn server_benchmarks(c: &mut Criterion) {
     });
 
     grpc_group.bench_function("get", |b| {
-        let mut client = rt.block_on(async {
-            let mut attempts = 0;
-            loop {
-                match connect(&endpoint).await {
-                    Ok(client) => break client,
-                    Err(e) => {
-                        attempts += 1;
-                        if attempts > 20 {
-                            panic!("connect gRPC client: {e}");
-                        }
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                    }
-                }
-            }
-        });
+        let mut client = client.clone();
         let key = grpc_key.clone();
         let bearer = token.to_string();
         b.iter(|| {
@@ -219,21 +207,7 @@ fn server_benchmarks(c: &mut Criterion) {
     });
 
     grpc_group.bench_function("delete", |b| {
-        let mut client = rt.block_on(async {
-            let mut attempts = 0;
-            loop {
-                match connect(&endpoint).await {
-                    Ok(client) => break client,
-                    Err(e) => {
-                        attempts += 1;
-                        if attempts > 20 {
-                            panic!("connect gRPC client: {e}");
-                        }
-                        tokio::time::sleep(Duration::from_millis(100)).await;
-                    }
-                }
-            }
-        });
+        let mut client = client.clone();
         let key = grpc_key.clone();
         let bearer = token.to_string();
         b.iter(|| {

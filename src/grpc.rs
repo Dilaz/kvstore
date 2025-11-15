@@ -27,6 +27,21 @@ impl KVStoreService {
     pub fn new(store: KVStore) -> Self {
         Self { store }
     }
+
+    /// Validate a request token
+    async fn validate_request_token(&self, token: &str) -> Result<(), Status> {
+        let is_valid = self
+            .store
+            .validate_token(token)
+            .await
+            .map_err(|e| Status::internal(format!("Token validation failed: {}", e)))?;
+
+        if !is_valid {
+            return Err(Status::unauthenticated("Invalid token"));
+        }
+
+        Ok(())
+    }
 }
 
 #[tonic::async_trait]
@@ -40,19 +55,15 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         tracing::info!(
             "gRPC GET {} (token: {})",
             req.key,
-            &req.token[..req.token.len().min(8)]
+            &req.token[..req
+                .token
+                .char_indices()
+                .nth(8)
+                .map_or(req.token.len(), |(i, _)| i)]
         );
 
         // Validate token
-        let is_valid = self
-            .store
-            .validate_token(&req.token)
-            .await
-            .map_err(|e| Status::internal(format!("Token validation failed: {}", e)))?;
-
-        if !is_valid {
-            return Err(Status::unauthenticated("Invalid token"));
-        }
+        self.validate_request_token(&req.token).await?;
 
         // Get the value
         match self.store.get(&req.token, &req.key).await {
@@ -74,20 +85,16 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         tracing::info!(
             "gRPC SET {} (token: {}, TTL: {:?})",
             req.key,
-            &req.token[..req.token.len().min(8)],
+            &req.token[..req
+                .token
+                .char_indices()
+                .nth(8)
+                .map_or(req.token.len(), |(i, _)| i)],
             req.ttl_seconds
         );
 
         // Validate token
-        let is_valid = self
-            .store
-            .validate_token(&req.token)
-            .await
-            .map_err(|e| Status::internal(format!("Token validation failed: {}", e)))?;
-
-        if !is_valid {
-            return Err(Status::unauthenticated("Invalid token"));
-        }
+        self.validate_request_token(&req.token).await?;
 
         // Set the value
         self.store
@@ -110,19 +117,15 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         tracing::info!(
             "gRPC DELETE {} (token: {})",
             req.key,
-            &req.token[..req.token.len().min(8)]
+            &req.token[..req
+                .token
+                .char_indices()
+                .nth(8)
+                .map_or(req.token.len(), |(i, _)| i)]
         );
 
         // Validate token
-        let is_valid = self
-            .store
-            .validate_token(&req.token)
-            .await
-            .map_err(|e| Status::internal(format!("Token validation failed: {}", e)))?;
-
-        if !is_valid {
-            return Err(Status::unauthenticated("Invalid token"));
-        }
+        self.validate_request_token(&req.token).await?;
 
         // Delete the value
         self.store
@@ -169,19 +172,15 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         tracing::info!(
             "gRPC LIST {} (token: {})",
             req.prefix,
-            &req.token[..req.token.len().min(8)]
+            &req.token[..req
+                .token
+                .char_indices()
+                .nth(8)
+                .map_or(req.token.len(), |(i, _)| i)]
         );
 
         // Validate token
-        let is_valid = self
-            .store
-            .validate_token(&req.token)
-            .await
-            .map_err(|e| Status::internal(format!("Token validation failed: {}", e)))?;
-
-        if !is_valid {
-            return Err(Status::unauthenticated("Invalid token"));
-        }
+        self.validate_request_token(&req.token).await?;
 
         // List keys
         let keys = self

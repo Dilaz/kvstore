@@ -235,7 +235,7 @@ impl KVStore {
         let keys = keys
             .into_iter()
             .filter_map(|k| {
-                if k.len() > prefix_len {
+                if k.len() >= prefix_len {
                     Some(k[prefix_len..].to_string())
                 } else {
                     None
