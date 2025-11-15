@@ -6,6 +6,7 @@ use crate::error::{KVStoreError, Result};
 use crate::REDIS_TOKENS_TABLE;
 use redis::{aio::ConnectionManager, AsyncCommands};
 use std::sync::Arc;
+use tokio_stream::StreamExt;
 
 /// Main KVStore struct that manages Redis connections and operations
 ///
@@ -224,10 +225,11 @@ impl KVStore {
         tracing::debug!("LIST {}", pattern);
 
         let mut conn = (*self.conn).clone();
-        let keys: Vec<String> = conn.keys(&pattern).await.map_err(|e| {
-            tracing::error!("Failed to list keys with pattern {}: {}", pattern, e);
+        let iter = conn.scan_match(&pattern).await.map_err(|e| {
+            tracing::error!("Failed to SCAN keys with pattern {}: {}", pattern, e);
             e
         })?;
+        let keys: Vec<String> = tokio_stream::StreamExt::collect(iter).await;
 
         // Remove the token prefix from each key
         let prefix_len = token.len() + 1; // +1 for the colon
