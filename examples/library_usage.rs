@@ -5,6 +5,7 @@
 //! This example demonstrates how to use KVStore as a library in your own application.
 
 use kvstore::KVStore;
+use tokio_stream::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -61,11 +62,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Set multiple user attributes");
 
     // List all user:123 keys
-    let keys = store.list(token, "user:123:").await?;
+    let keys: Vec<String> = store.list(token, "user:123:").await?.collect().await;
     println!("✓ Keys with prefix 'user:123:': {:?}", keys);
 
     // List all user keys
-    let all_user_keys = store.list(token, "user:").await?;
+    let all_user_keys: Vec<String> = store.list(token, "user:").await?.collect().await;
     println!("✓ All user keys: {:?}", all_user_keys);
 
     // Delete a value

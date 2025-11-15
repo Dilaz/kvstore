@@ -14,5 +14,5 @@ spec:
       targetPort: 50051
   selector:
     app: kvstore-grpc
-  type: NodePort
+  type: ClusterPort
 

@@ -47,6 +47,7 @@ anyhow = "1.0.100"
 
 # Async runtime
 tokio = { version = "1.48.0", features = ["full"] }
+futures = "0.3"
 
 # Middleware
 tower = { version = "0.5.2", features = ["util", "timeout", "load-shed", "limit", "tokio"] }

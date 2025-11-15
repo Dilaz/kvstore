@@ -4,6 +4,7 @@
 
 use kvstore::{create_grpc_server, create_http_server, KVStore};
 use tokio_stream::wrappers::TcpListenerStream;
+use tokio_stream::StreamExt;
 use tonic::transport::Server;
 
 mod http_tests {
@@ -381,7 +382,7 @@ mod store_tests {
             .unwrap();
 
         // List with prefix
-        let keys = store.list("store-test-token", "list:").await.unwrap();
+        let keys: Vec<String> = store.list("store-test-token", "list:").await.unwrap().collect().await;
         assert_eq!(keys.len(), 2);
         assert!(keys.contains(&"list:key1".to_string()));
         assert!(keys.contains(&"list:key2".to_string()));
