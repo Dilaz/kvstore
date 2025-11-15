@@ -24,11 +24,13 @@ A lightweight, production-ready Rust library for key-value storage with **HTTP**
 # Start Redis
 docker-compose up -d redis
 
-# Run the server (both HTTP and gRPC)
-cargo run --release
+# Run the server with --mode flag
+cargo run --release -- --mode=http   # HTTP server only
+cargo run --release -- --mode=grpc   # gRPC server only
+cargo run --release -- --mode=dual    # Both HTTP and gRPC servers
 
-# HTTP server runs on port 3000
-# gRPC server runs on port 50051
+# HTTP server runs on port 3000 (default)
+# gRPC server runs on port 50051 (default)
 ```
 
 ### As a Library
@@ -141,15 +143,19 @@ See the [proto file](proto/kvstore.proto) for full definitions.
 
 ## Configuration
 
-Configure the server using environment variables:
+Configure the server using command-line flags and environment variables:
+
+### Command-Line Flags
+
+- `--mode=http|grpc|dual` - Select which server(s) to start (required)
+
+### Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `REDIS_URL` | `redis://127.0.0.1:6379` | Redis connection URL |
 | `HTTP_PORT` | `3000` | HTTP server port |
 | `GRPC_PORT` | `50051` | gRPC server port |
-| `ENABLE_HTTP` | `true` | Enable HTTP server |
-| `ENABLE_GRPC` | `true` | Enable gRPC server |
 | `RUST_LOG` | `kvstore=info,tower_http=info` | Logging level |
 
 ## Authentication
@@ -175,25 +181,55 @@ The `examples/` directory contains several usage examples:
 ### HTTP Server Only
 
 ```bash
-cargo run --example http_server
+cargo run --release -- --mode=http
 ```
 
 ### gRPC Server Only
 
 ```bash
-cargo run --example grpc_server
+cargo run --release -- --mode=grpc
 ```
 
 ### Dual HTTP + gRPC Server
 
 ```bash
-cargo run --example dual_server
+cargo run --release -- --mode=dual
 ```
+
+Note: The `examples/` directory still contains example code that demonstrates server setup patterns.
 
 ### Library Usage
 
 ```bash
 cargo run --example library_usage
+```
+
+## Client Library
+
+A separate `kvstore-client` crate is available for use in your Rust projects:
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+kvstore-client = { path = "../kvstore-client" }
+# or from crates.io (when published)
+# kvstore-client = "0.2"
+```
+
+Use in your code:
+
+```rust
+use kvstore_client::{KvStoreClient, connect};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Connect to the server
+    let mut client = connect("http://127.0.0.1:50051").await?;
+    
+    // Use the client...
+    Ok(())
+}
 ```
 
 ## Development
@@ -329,48 +365,29 @@ let service = create_grpc_server(store);
 
 ## Performance
 
-KVStore is built on high-performance async Rust libraries:
+Benchmarks captured with `cargo bench --bench benchmarks` on a local WSL2 dev machine (Redis 7.2 running on localhost). Values show Criterion's reported median latency per operation and the derived throughput (`1_000_000 / latency_µs`).
 
-- **Axum**: Fast, ergonomic web framework
-- **Tonic**: High-performance gRPC implementation
-- **Tokio**: Efficient async runtime
-- **Redis**: In-memory data structure store
+| Scenario | Median latency | Approx throughput |
+|----------|----------------|-------------------|
+| Library `set` | 172 µs | ~5.8k ops/s |
+| Library `get` | 167 µs | ~6.0k ops/s |
+| Library `delete` | 161 µs | ~6.2k ops/s |
+| HTTP `set` | 390 µs | ~2.6k req/s |
+| HTTP `get` | 359 µs | ~2.8k req/s |
+| HTTP `delete` | 363 µs | ~2.8k req/s |
+| gRPC `set` | 419 µs | ~2.4k req/s |
+| gRPC `get` | 430 µs | ~2.3k req/s |
+| gRPC `delete` | 420 µs | ~2.4k req/s |
 
-Benchmarks (on a standard development machine):
-- HTTP throughput: ~50,000 req/s
-- gRPC throughput: ~60,000 req/s
-- Latency (p99): <5ms
+*Hardware, Redis configuration, and network path heavily influence these numbers; run the same command in your environment to obtain comparable measurements.*
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+KVStore builds on:
+- **Axum** for the HTTP API
+- **Tonic** for gRPC
+- **Tokio** for the async runtime
+- **Redis** for storage
 
 ## License
 
-This project is licensed under either of:
+MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
 
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
-
-## Changelog
-
-### Version 0.2.0
-
-- ✨ Added gRPC support
-- ✨ Restructured as library + binary
-- ✨ Added comprehensive tests
-- ✨ Added TTL support for keys
-- ✨ Added key listing functionality
-- ✨ Improved error handling
-- ✨ Better documentation and examples
-- ⬆️ Updated all dependencies
-- 🎨 Cleaner, more modular code structure
-
-### Version 0.1.0
-
-- 🎉 Initial release
-- HTTP REST API
-- Redis backend
-- Token authentication

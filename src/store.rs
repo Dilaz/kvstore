@@ -170,10 +170,12 @@ impl KVStore {
                     e
                 })?;
         } else {
-            conn.set::<_, _, ()>(&namespaced_key, value).await.map_err(|e| {
-                tracing::error!("Failed to set key {}: {}", namespaced_key, e);
-                e
-            })?;
+            conn.set::<_, _, ()>(&namespaced_key, value)
+                .await
+                .map_err(|e| {
+                    tracing::error!("Failed to set key {}: {}", namespaced_key, e);
+                    e
+                })?;
         }
 
         Ok(())

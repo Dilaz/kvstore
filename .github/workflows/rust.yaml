@@ -19,6 +19,11 @@ jobs:
         with:
           profile: minimal
           toolchain: stable
+      - name: Install Protocol Buffers Compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
+          protoc --version
       - name: Build and test code
         run: |
           cargo build --verbose
@@ -80,9 +85,11 @@ jobs:
           action: deploy
           strategy: basic
           manifests: |
-            k8s/deployment.yaml
+            k8s/deployment-http.yaml
+            k8s/deployment-grpc.yaml
+            k8s/service-http.yaml
+            k8s/service-grpc.yaml
             k8s/ingress.yaml
-            k8s/service.yaml
           images: |
             ghcr.io/dilaz/kvstore:${{ github.sha }}
   rollback:

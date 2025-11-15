@@ -1,0 +1,24 @@
+[package]
+name = "kvstore-client"
+version = "0.2.0"
+edition = "2021"
+authors = ["dilaz"]
+description = "Client library for KVStore gRPC service"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dilaz/kvstore"
+keywords = ["kvstore", "grpc", "client"]
+categories = ["web-programming", "api-bindings"]
+
+[lib]
+name = "kvstore_client"
+path = "src/lib.rs"
+
+[dependencies]
+tonic = "0.14.2"
+prost = "0.14.1"
+tokio = { version = "1.48.0", features = ["net", "rt-multi-thread"] }
+tonic-prost = "0.14.2"
+
+[build-dependencies]
+tonic-prost-build = "0.14.2"
+

@@ -90,6 +90,12 @@ pub fn create_grpc_server(
     grpc::create_service(store)
 }
 
+/// Creates a gRPC reflection service for the KVStore API
+pub fn create_grpc_reflection_service(
+) -> std::result::Result<impl Clone, tonic_reflection::server::Error> {
+    grpc::create_reflection_service()
+}
+
 /// Default Redis tokens set name
 pub const REDIS_TOKENS_TABLE: &str = "tokens";
 

@@ -1,7 +1,8 @@
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: kvstore
+  name: kvstore-http
   namespace: kvstore
   annotations:
     kubernetes.io/ingress.class: "traefik"
@@ -16,10 +17,36 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: kvstore
+                name: kvstore-http
                 port:
                   number: 3000
   tls:
     - secretName: kvstore-tls
       hosts:
         - kvstore.binarydream.fi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: kvstore-grpc
+  namespace: kvstore
+  annotations:
+    kubernetes.io/ingress.class: "traefik"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  rules:
+    - host: grpc.kvstore.binarydream.fi
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kvstore-grpc
+                port:
+                  number: 50051
+  tls:
+    - secretName: kvstore-grpc-tls
+      hosts:
+        - grpc.kvstore.binarydream.fi
