@@ -89,7 +89,11 @@ async fn get_key(
     State(store): State<KVStore>,
     Path(key): Path<String>,
 ) -> Result<impl IntoResponse> {
-    tracing::info!("GET {} (token: {})", key, &token[..token.len().min(8)]);
+    tracing::info!(
+        "GET {} (token: {})",
+        key,
+        &token[..token.char_indices().nth(8).map_or(token.len(), |(i, _)| i)]
+    );
 
     let value = store.get(&token, &key).await?;
 
@@ -109,7 +113,7 @@ async fn post_value(
     tracing::info!(
         "SET {} (token: {}, TTL: {:?})",
         key,
-        &token[..token.len().min(8)],
+        &token[..token.char_indices().nth(8).map_or(token.len(), |(i, _)| i)],
         payload.ttl_seconds
     );
 
@@ -134,7 +138,11 @@ async fn delete_key(
     State(store): State<KVStore>,
     Path(key): Path<String>,
 ) -> Result<impl IntoResponse> {
-    tracing::info!("DELETE {} (token: {})", key, &token[..token.len().min(8)]);
+    tracing::info!(
+        "DELETE {} (token: {})",
+        key,
+        &token[..token.char_indices().nth(8).map_or(token.len(), |(i, _)| i)]
+    );
 
     store.delete(&token, &key).await?;
 
