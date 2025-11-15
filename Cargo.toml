@@ -8,7 +8,7 @@ edition = "2021"
 authors = ["KVStore Contributors"]
 description = "A lightweight, production-ready Rust library for key-value storage with HTTP and gRPC support, backed by Redis"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/kvstore"
+repository = "https://github.com/dilaz/kvstore"
 keywords = ["kvstore", "redis", "grpc", "http", "api"]
 categories = ["web-programming", "api-bindings", "database"]
 
@@ -24,7 +24,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Web framework
-axum = "0.8.6"
+axum = "0.8.7"
 axum-macros = "0.5.0"
 
 # gRPC support
@@ -32,7 +32,7 @@ tonic = "0.14.2"
 prost = "0.14.1"
 tokio-stream = { version = "0.1.17", features = ["net"] }
 tonic-prost = "0.14.2"
-tonic-reflection = "0.14"
+tonic-reflection = "0.14.2"
 
 # Redis client
 redis = { version = "0.32.7", features = ["connection-manager", "aio", "tokio-comp"] }
@@ -57,7 +57,7 @@ tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 # Command-line argument parsing
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5.51", features = ["derive"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
@@ -66,8 +66,8 @@ tonic-prost-build = "0.14.2"
 tokio-test = "0.4.4"
 mockall = "0.13.1"
 tempfile = "3.23.0"
-criterion = { version = "0.5.1", features = ["async_tokio"] }
-reqwest = { version = "0.12.5", features = ["json"] }
+criterion = { version = "0.7.0", features = ["async_tokio"] }
+reqwest = { version = "0.12.24", features = ["json"] }
 kvstore-client = { path = "kvstore-client" }
 
 [[bench]]
