@@ -4,8 +4,10 @@
 
 use crate::error::{KVStoreError, Result};
 use crate::REDIS_TOKENS_TABLE;
+use futures::StreamExt;
 use redis::{aio::ConnectionManager, AsyncCommands};
 use std::sync::Arc;
+use tokio_stream::{wrappers::ReceiverStream, Stream};
 
 /// Main KVStore struct that manages Redis connections and operations
 ///
@@ -213,37 +215,47 @@ impl KVStore {
     ///
     /// # Returns
     ///
-    /// A vector of keys (without the token namespace)
-    pub async fn list(&self, token: &str, prefix: &str) -> Result<Vec<String>> {
+    /// A stream of keys (without the token namespace)
+    pub async fn list(&self, token: &str, prefix: &str) -> Result<impl Stream<Item = String>> {
         let pattern = if prefix.is_empty() {
             format!("{}:*", token)
         } else {
             format!("{}:{}*", token, prefix)
         };
-
         tracing::debug!("LIST {}", pattern);
 
-        let mut conn = (*self.conn).clone();
-        let iter = conn.scan_match(&pattern).await.map_err(|e| {
-            tracing::error!("Failed to SCAN keys with pattern {}: {}", pattern, e);
-            e
-        })?;
-        let keys: Vec<String> = tokio_stream::StreamExt::collect(iter).await;
-
-        // Remove the token prefix from each key
+        let conn = (*self.conn).clone();
         let prefix_len = token.len() + 1; // +1 for the colon
-        let keys = keys
-            .into_iter()
-            .filter_map(|k| {
-                if k.len() >= prefix_len {
-                    Some(k[prefix_len..].to_string())
+
+        let (tx, rx) = tokio::sync::mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut conn = conn;
+            let iter = match conn.scan_match(&pattern).await {
+                Ok(iter) => iter,
+                Err(e) => {
+                    tracing::error!("Failed to SCAN keys with pattern {}: {}", pattern, e);
+                    return;
+                }
+            };
+
+            let mut stream = iter.take(1000).filter_map(move |key: String| {
+                let result = if key.len() >= prefix_len {
+                    Some(key[prefix_len..].to_string())
                 } else {
                     None
-                }
-            })
-            .collect();
+                };
+                futures::future::ready(result)
+            });
 
-        Ok(keys)
+            while let Some(key) = stream.next().await {
+                if tx.send(key).await.is_err() {
+                    break;
+                }
+            }
+        });
+
+        Ok(ReceiverStream::new(rx))
     }
 
     /// Check if the Redis connection is healthy

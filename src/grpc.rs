@@ -3,7 +3,7 @@
 //! Provides gRPC service for KVStore operations.
 
 use crate::{KVStore, KVStoreError};
-use tokio_stream::wrappers::ReceiverStream;
+use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status};
 
 // Include generated protobuf code
@@ -161,7 +161,7 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         }))
     }
 
-    type ListStream = ReceiverStream<Result<kv_store::ListResponse, Status>>;
+    type ListStream = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<kv_store::ListResponse, Status>> + Send>>;
 
     async fn list(
         &self,
@@ -182,27 +182,17 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
         // Validate token
         self.validate_request_token(&req.token).await?;
 
-        // List keys
-        let keys = self
+        // List keys - get a stream
+        let key_stream = self
             .store
             .list(&req.token, &req.prefix)
             .await
             .map_err(Status::from)?;
 
-        // Create a channel for streaming responses
-        let (tx, rx) = tokio::sync::mpsc::channel(128);
+        // Map the stream to gRPC responses
+        let response_stream = key_stream.map(|key| Ok(kv_store::ListResponse { key }));
 
-        // Spawn a task to send keys
-        tokio::spawn(async move {
-            for key in keys {
-                if tx.send(Ok(kv_store::ListResponse { key })).await.is_err() {
-                    // Client disconnected
-                    break;
-                }
-            }
-        });
-
-        Ok(Response::new(ReceiverStream::new(rx)))
+        Ok(Response::new(Box::pin(response_stream)))
     }
 }
 

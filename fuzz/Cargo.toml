@@ -9,6 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+once_cell = "1.19"
 
 [dependencies.kvstore]
 path = ".."

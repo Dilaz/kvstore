@@ -2,6 +2,7 @@
 
 use kvstore::KVStore;
 use libfuzzer_sys::fuzz_target;
+use once_cell::sync::Lazy;
 use std::str;
 use tokio::runtime::Runtime;
 
@@ -13,14 +14,10 @@ use tokio::runtime::Runtime;
 // find panics or unexpected behavior in the store's implementation when
 // handling arbitrary data.
 
-fuzz_target!(|data: &[u8]| {
-    // We need a tokio runtime to run our async functions.
-    let rt = match Runtime::new() {
-        Ok(rt) => rt,
-        Err(_) => return,
-    };
+static RUNTIME: Lazy<Runtime> = Lazy::new(|| Runtime::new().unwrap());
 
-    rt.block_on(async {
+fuzz_target!(|data: &[u8]| {
+    RUNTIME.block_on(async {
         // Create a new KVStore instance.
         // This will fail if Redis is not running, but the fuzzer will just ignore it
         // and continue with the next input.
