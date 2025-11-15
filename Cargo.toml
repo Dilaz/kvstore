@@ -56,6 +56,9 @@ tower-http = { version = "0.6.6", features = ["add-extension", "auth", "compress
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
+# Command-line argument parsing
+clap = { version = "4.5", features = ["derive"] }
+
 [build-dependencies]
 tonic-prost-build = "0.14.2"
 

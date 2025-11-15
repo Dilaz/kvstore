@@ -15,6 +15,7 @@
 //! - `GRPC_PORT`: gRPC server port (default: 50051)
 //! - `RUST_LOG`: Logging level (default: "kvstore=info,tower_http=info")
 
+use clap::Parser;
 use kvstore::{create_grpc_server, create_http_server, KVStore};
 use std::net::{Ipv4Addr, SocketAddr};
 use tonic::transport::Server;
@@ -28,58 +29,29 @@ enum Mode {
     Dual,
 }
 
-#[derive(Debug)]
-enum CliError {
-    MissingMode,
-    InvalidMode(String),
-}
+impl std::str::FromStr for Mode {
+    type Err = String;
 
-impl std::fmt::Display for CliError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CliError::MissingMode => write!(f, "Missing --mode flag"),
-            CliError::InvalidMode(mode) => write!(
-                f,
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "http" => Ok(Mode::Http),
+            "grpc" => Ok(Mode::Grpc),
+            "dual" => Ok(Mode::Dual),
+            _ => Err(format!(
                 "Invalid mode: {}. Must be one of: http, grpc, dual",
-                mode
-            ),
+                s
+            )),
         }
     }
 }
 
-impl std::error::Error for CliError {}
-
-fn parse_mode(args: &[String]) -> Result<Mode, CliError> {
-    for (i, arg) in args.iter().enumerate() {
-        if arg == "--mode" {
-            if let Some(mode_str) = args.get(i + 1) {
-                return match mode_str.as_str() {
-                    "http" => Ok(Mode::Http),
-                    "grpc" => Ok(Mode::Grpc),
-                    "dual" => Ok(Mode::Dual),
-                    _ => Err(CliError::InvalidMode(mode_str.clone())),
-                };
-            } else {
-                return Err(CliError::MissingMode);
-            }
-        } else if arg.starts_with("--mode=") {
-            let mode_str = arg.strip_prefix("--mode=").unwrap();
-            return match mode_str {
-                "http" => Ok(Mode::Http),
-                "grpc" => Ok(Mode::Grpc),
-                "dual" => Ok(Mode::Dual),
-                _ => Err(CliError::InvalidMode(mode_str.to_string())),
-            };
-        }
-    }
-    Err(CliError::MissingMode)
-}
-
-fn print_usage() {
-    eprintln!("Usage: kvstore --mode=http|grpc|dual");
-    eprintln!("  --mode=http  Start HTTP server only");
-    eprintln!("  --mode=grpc  Start gRPC server only");
-    eprintln!("  --mode=dual  Start both HTTP and gRPC servers");
+#[derive(Parser, Debug)]
+#[command(name = "kvstore")]
+#[command(about = "A production-ready key-value storage server with HTTP and gRPC support")]
+struct Args {
+    /// Select which server(s) to start
+    #[arg(long, value_name = "MODE", required = true)]
+    mode: Mode,
 }
 
 async fn run_http(
@@ -146,15 +118,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .init();
 
     // Parse command line arguments
-    let args: Vec<String> = std::env::args().collect();
-    let mode = match parse_mode(&args) {
-        Ok(m) => m,
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            print_usage();
-            return Err(e.into());
-        }
-    };
+    let args = Args::parse();
+    let mode = args.mode;
 
     tracing::info!("Starting KVStore server in {:?} mode", mode);
 
@@ -204,72 +169,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_mode_http() {
-        let args = vec![
-            "kvstore".to_string(),
-            "--mode".to_string(),
-            "http".to_string(),
-        ];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Http);
+    fn test_mode_from_str_http() {
+        assert_eq!("http".parse::<Mode>().unwrap(), Mode::Http);
     }
 
     #[test]
-    fn test_parse_mode_grpc() {
-        let args = vec![
-            "kvstore".to_string(),
-            "--mode".to_string(),
-            "grpc".to_string(),
-        ];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Grpc);
+    fn test_mode_from_str_grpc() {
+        assert_eq!("grpc".parse::<Mode>().unwrap(), Mode::Grpc);
     }
 
     #[test]
-    fn test_parse_mode_dual() {
-        let args = vec![
-            "kvstore".to_string(),
-            "--mode".to_string(),
-            "dual".to_string(),
-        ];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Dual);
+    fn test_mode_from_str_dual() {
+        assert_eq!("dual".parse::<Mode>().unwrap(), Mode::Dual);
     }
 
     #[test]
-    fn test_parse_mode_missing() {
-        let args = vec!["kvstore".to_string()];
-        assert!(matches!(parse_mode(&args), Err(CliError::MissingMode)));
-    }
-
-    #[test]
-    fn test_parse_mode_invalid() {
-        let args = vec![
-            "kvstore".to_string(),
-            "--mode".to_string(),
-            "invalid".to_string(),
-        ];
-        assert!(matches!(parse_mode(&args), Err(CliError::InvalidMode(_))));
-    }
-
-    #[test]
-    fn test_parse_mode_missing_value() {
-        let args = vec!["kvstore".to_string(), "--mode".to_string()];
-        assert!(matches!(parse_mode(&args), Err(CliError::MissingMode)));
-    }
-
-    #[test]
-    fn test_parse_mode_equals_format() {
-        let args = vec!["kvstore".to_string(), "--mode=http".to_string()];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Http);
-    }
-
-    #[test]
-    fn test_parse_mode_equals_format_grpc() {
-        let args = vec!["kvstore".to_string(), "--mode=grpc".to_string()];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Grpc);
-    }
-
-    #[test]
-    fn test_parse_mode_equals_format_dual() {
-        let args = vec!["kvstore".to_string(), "--mode=dual".to_string()];
-        assert_eq!(parse_mode(&args).unwrap(), Mode::Dual);
+    fn test_mode_from_str_invalid() {
+        assert!("invalid".parse::<Mode>().is_err());
     }
 }
