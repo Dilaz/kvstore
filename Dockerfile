@@ -1,5 +1,6 @@
 FROM rust:1.83 AS builder
 WORKDIR /kvstore
+RUN apt-get update && apt-get install -y protobuf-compiler && rm -rf /var/lib/apt/lists/*
 COPY . .
 RUN cargo build --release
 

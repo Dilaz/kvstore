@@ -2,15 +2,17 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: kvstore
+  name: kvstore-http
   namespace: kvstore
   labels:
-    app: kvstore
+    app: kvstore-http
 spec:
   ports:
-    - port: 3000
+    - name: http
+      port: 3000
       protocol: TCP
       targetPort: 3000
   selector:
-    app: kvstore
+    app: kvstore-http
   type: NodePort
+

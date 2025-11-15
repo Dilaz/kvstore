@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kvstore-grpc
+  namespace: kvstore
+  labels:
+    app: kvstore-grpc
+spec:
+  ports:
+    - name: grpc
+      port: 50051
+      protocol: TCP
+      targetPort: 50051
+  selector:
+    app: kvstore-grpc
+  type: NodePort
+

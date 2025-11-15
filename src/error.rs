@@ -90,12 +90,12 @@ impl IntoResponse for KVStoreError {
 impl From<KVStoreError> for tonic::Status {
     fn from(error: KVStoreError) -> Self {
         match error {
-            KVStoreError::Redis(e) => {
-                tonic::Status::internal(format!("Database error: {}", e))
-            }
+            KVStoreError::Redis(e) => tonic::Status::internal(format!("Database error: {}", e)),
             KVStoreError::Io(e) => tonic::Status::internal(format!("IO error: {}", e)),
             KVStoreError::Unauthorized(msg) => tonic::Status::unauthenticated(msg),
-            KVStoreError::KeyNotFound(key) => tonic::Status::not_found(format!("Key not found: {}", key)),
+            KVStoreError::KeyNotFound(key) => {
+                tonic::Status::not_found(format!("Key not found: {}", key))
+            }
             KVStoreError::InvalidRequest(msg) => tonic::Status::invalid_argument(msg),
             KVStoreError::Internal(msg) => tonic::Status::internal(msg),
             KVStoreError::Utf8(e) => tonic::Status::internal(format!("Encoding error: {}", e)),

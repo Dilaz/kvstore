@@ -2,10 +2,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kvstore
+  name: kvstore-http
   namespace: kvstore
   labels:
-    app: kvstore
+    app: kvstore-http
 spec:
   replicas: 2
   strategy:
@@ -15,16 +15,17 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: kvstore
+      app: kvstore-http
   template:
     metadata:
       labels:
-        app: kvstore
+        app: kvstore-http
     spec:
       containers:
-      - name: kvstore
+      - name: kvstore-http
         image: ghcr.io/dilaz/kvstore:latest
         imagePullPolicy: Always
+        args: ["--mode=http"]
         securityContext:
           allowPrivilegeEscalation: false
           runAsNonRoot: true
@@ -33,7 +34,8 @@ spec:
           capabilities:
             drop: [ALL]
         ports:
-          - containerPort: 3000
+          - name: http
+            containerPort: 3000
             protocol: TCP
         readinessProbe:
           httpGet:
@@ -54,6 +56,10 @@ spec:
           limits:
             memory: 100Mi
             cpu: 15m
+        env:
+          - name: HTTP_PORT
+            value: "3000"
         envFrom:
           - secretRef:
               name: kvstore-secrets
+

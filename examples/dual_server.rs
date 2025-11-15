@@ -42,10 +42,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("gRPC: localhost:50051");
 
     // Wait for both servers
-    tokio::try_join!(
-        async { http_handle.await? },
-        async { grpc_handle.await? }
-    )?;
+    match http_handle.await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => return Err(format!("HTTP server error: {}", e).into()),
+        Err(e) => return Err(format!("HTTP server task error: {}", e).into()),
+    }
+
+    match grpc_handle.await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => return Err(format!("gRPC server error: {}", e).into()),
+        Err(e) => return Err(format!("gRPC server task error: {}", e).into()),
+    }
 
     Ok(())
 }

@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kvstore-grpc
+  namespace: kvstore
+  labels:
+    app: kvstore-grpc
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: kvstore-grpc
+  template:
+    metadata:
+      labels:
+        app: kvstore-grpc
+    spec:
+      containers:
+      - name: kvstore-grpc
+        image: ghcr.io/dilaz/kvstore:latest
+        imagePullPolicy: Always
+        args: ["--mode=grpc"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          runAsUser: 10000
+          capabilities:
+            drop: [ALL]
+        ports:
+          - name: grpc
+            containerPort: 50051
+            protocol: TCP
+        readinessProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          grpc:
+            port: 50051
+          initialDelaySeconds: 60
+          periodSeconds: 20
+        resources:
+          requests:
+            memory: 64Mi
+            cpu: 5m
+          limits:
+            memory: 100Mi
+            cpu: 15m
+        env:
+          - name: GRPC_PORT
+            value: "50051"
+        envFrom:
+          - secretRef:
+              name: kvstore-secrets
+

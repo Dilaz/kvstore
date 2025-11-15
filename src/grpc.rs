@@ -11,6 +11,9 @@ pub mod kv_store {
     tonic::include_proto!("kvstore");
 }
 
+pub const KVSTORE_FILE_DESCRIPTOR_SET: &[u8] =
+    tonic::include_file_descriptor_set!("kvstore_descriptor");
+
 pub use kv_store::kv_store_server;
 pub use kv_store::kv_store_server::KvStoreServer;
 
@@ -53,10 +56,7 @@ impl kv_store::kv_store_server::KvStore for KVStoreService {
 
         // Get the value
         match self.store.get(&req.token, &req.key).await {
-            Ok(value) => Ok(Response::new(kv_store::GetResponse {
-                value,
-                found: true,
-            })),
+            Ok(value) => Ok(Response::new(kv_store::GetResponse { value, found: true })),
             Err(KVStoreError::KeyNotFound(_)) => Ok(Response::new(kv_store::GetResponse {
                 value: String::new(),
                 found: false,
@@ -212,10 +212,16 @@ pub fn create_service(store: KVStore) -> KvStoreServer<KVStoreService> {
     KvStoreServer::new(KVStoreService::new(store))
 }
 
+/// Create a gRPC reflection service for the KVStore API
+pub fn create_reflection_service(
+) -> std::result::Result<impl Clone, tonic_reflection::server::Error> {
+    tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(KVSTORE_FILE_DESCRIPTOR_SET)
+        .build_v1()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn test_service_creation() {
         // This is a basic smoke test

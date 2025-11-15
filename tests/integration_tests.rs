@@ -3,7 +3,7 @@
 //! These tests require a running Redis instance at redis://127.0.0.1:6379
 
 use kvstore::{create_grpc_server, create_http_server, KVStore};
-use std::net::SocketAddr;
+use tokio_stream::wrappers::TcpListenerStream;
 use tonic::transport::Server;
 
 mod http_tests {
@@ -23,7 +23,7 @@ mod http_tests {
         redis::cmd("SADD")
             .arg("tokens")
             .arg("test-token")
-            .query_async::<_, ()>(&mut conn)
+            .query_async::<()>(&mut conn)
             .await
             .expect("Failed to add test token");
 
@@ -149,12 +149,11 @@ mod http_tests {
 mod grpc_tests {
     use super::*;
     use kvstore::grpc::kv_store::{
-        kv_store_client::KvStoreClient, DeleteRequest, GetRequest, HealthCheckRequest,
-        SetRequest,
+        kv_store_client::KvStoreClient, DeleteRequest, GetRequest, HealthCheckRequest, SetRequest,
     };
     use tonic::transport::Channel;
 
-    async fn setup_grpc_test() -> (KVStore, tokio::task::JoinHandle<()>) {
+    async fn setup_grpc_test() -> (KVStore, tokio::task::JoinHandle<()>, u16) {
         let store = KVStore::new("redis://127.0.0.1:6379")
             .await
             .expect("Failed to connect to Redis");
@@ -164,19 +163,24 @@ mod grpc_tests {
         redis::cmd("SADD")
             .arg("tokens")
             .arg("grpc-test-token")
-            .query_async::<_, ()>(&mut conn)
+            .query_async::<()>(&mut conn)
             .await
             .expect("Failed to add test token");
 
-        // Start gRPC server on a random port
-        let addr: SocketAddr = "127.0.0.1:50052".parse().unwrap();
+        // Start gRPC server on a random available port
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("Failed to bind to port");
+        let addr = listener.local_addr().expect("Failed to get local address");
+        let port = addr.port();
+
         let store_clone = store.clone();
         let service = create_grpc_server(store_clone);
 
         let handle = tokio::spawn(async move {
             Server::builder()
                 .add_service(service)
-                .serve(addr)
+                .serve_with_incoming(TcpListenerStream::new(listener))
                 .await
                 .unwrap();
         });
@@ -184,11 +188,11 @@ mod grpc_tests {
         // Give the server time to start
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        (store, handle)
+        (store, handle, port)
     }
 
-    async fn create_client() -> KvStoreClient<Channel> {
-        KvStoreClient::connect("http://127.0.0.1:50052")
+    async fn create_client(port: u16) -> KvStoreClient<Channel> {
+        KvStoreClient::connect(format!("http://127.0.0.1:{}", port))
             .await
             .expect("Failed to connect to gRPC server")
     }
@@ -196,13 +200,10 @@ mod grpc_tests {
     #[tokio::test]
     #[ignore] // Requires Redis
     async fn test_grpc_health_check() {
-        let (_store, _handle) = setup_grpc_test().await;
-        let mut client = create_client().await;
+        let (_store, _handle, port) = setup_grpc_test().await;
+        let mut client = create_client(port).await;
 
-        let response = client
-            .health_check(HealthCheckRequest {})
-            .await
-            .unwrap();
+        let response = client.health_check(HealthCheckRequest {}).await.unwrap();
 
         assert!(response.get_ref().healthy);
     }
@@ -210,8 +211,8 @@ mod grpc_tests {
     #[tokio::test]
     #[ignore] // Requires Redis
     async fn test_grpc_set_and_get() {
-        let (store, _handle) = setup_grpc_test().await;
-        let mut client = create_client().await;
+        let (store, _handle, port) = setup_grpc_test().await;
+        let mut client = create_client(port).await;
 
         // Set a value
         let set_response = client
@@ -239,13 +240,16 @@ mod grpc_tests {
         assert_eq!(get_response.get_ref().value, "grpc-test-value");
 
         // Clean up
-        store.delete("grpc-test-token", "grpc-test-key").await.unwrap();
+        store
+            .delete("grpc-test-token", "grpc-test-key")
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     #[ignore] // Requires Redis
     async fn test_grpc_delete() {
-        let (store, _handle) = setup_grpc_test().await;
+        let (store, _handle, port) = setup_grpc_test().await;
 
         // Set a value first
         store
@@ -253,7 +257,7 @@ mod grpc_tests {
             .await
             .unwrap();
 
-        let mut client = create_client().await;
+        let mut client = create_client(port).await;
 
         // Delete the value
         let delete_response = client
@@ -274,8 +278,8 @@ mod grpc_tests {
     #[tokio::test]
     #[ignore] // Requires Redis
     async fn test_grpc_unauthorized() {
-        let (_store, _handle) = setup_grpc_test().await;
-        let mut client = create_client().await;
+        let (_store, _handle, port) = setup_grpc_test().await;
+        let mut client = create_client(port).await;
 
         // Try to get with invalid token
         let result = client
@@ -304,7 +308,7 @@ mod store_tests {
         redis::cmd("SADD")
             .arg("tokens")
             .arg("store-test-token")
-            .query_async::<_, ()>(&mut conn)
+            .query_async::<()>(&mut conn)
             .await
             .expect("Failed to add test token");
 

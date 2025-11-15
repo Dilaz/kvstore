@@ -28,7 +28,7 @@ pub fn create_router(store: KVStore) -> Router {
     Router::new()
         .route("/healthz", get(healthcheck))
         .route(
-            "/:key",
+            "/{key}",
             get(get_key)
                 .post(post_value)
                 .delete(delete_key)

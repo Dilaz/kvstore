@@ -30,7 +30,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     redis::cmd("SADD")
         .arg("tokens")
         .arg(token)
-        .query_async::<_, ()>(&mut conn)
+        .query_async::<()>(&mut conn)
         .await?;
     println!("✓ Demo token created");
 
@@ -53,7 +53,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Get user:123:name = {}", name);
 
     // Set multiple values
-    store.set(token, "user:123:email", "alice@example.com", None).await?;
+    store
+        .set(token, "user:123:email", "alice@example.com", None)
+        .await?;
     store.set(token, "user:123:age", "30", None).await?;
     store.set(token, "user:456:name", "Bob", None).await?;
     println!("✓ Set multiple user attributes");
@@ -84,7 +86,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     redis::cmd("SREM")
         .arg("tokens")
         .arg(token)
-        .query_async::<_, ()>(&mut conn)
+        .query_async::<()>(&mut conn)
         .await?;
     println!("✓ Cleaned up test data");
 
