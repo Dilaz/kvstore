@@ -1,10 +1,11 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use kvstore::{create_grpc_server, create_http_server, KVStore};
 use kvstore_client::{
     connect, generated::DeleteRequest, generated::GetRequest, generated::SetRequest,
 };
 use redis::AsyncCommands;
 use reqwest::Client;
+use std::hint::black_box;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use tonic::Request;

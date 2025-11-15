@@ -277,8 +277,10 @@ docker-compose up
 Kubernetes manifests are available in the `k8s/` directory:
 
 ```bash
-kubectl apply -f k8s/deployment.yaml
-kubectl apply -f k8s/service.yaml
+kubectl apply -f k8s/deployment-http.yaml
+kubectl apply -f k8s/deployment-grpc.yaml
+kubectl apply -f k8s/service-http.yaml
+kubectl apply -f k8s/service-grpc.yaml
 kubectl apply -f k8s/ingress.yaml
 ```
 

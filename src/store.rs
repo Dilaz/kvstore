@@ -6,7 +6,6 @@ use crate::error::{KVStoreError, Result};
 use crate::REDIS_TOKENS_TABLE;
 use redis::{aio::ConnectionManager, AsyncCommands};
 use std::sync::Arc;
-use tokio_stream::StreamExt;
 
 /// Main KVStore struct that manages Redis connections and operations
 ///
