@@ -5,7 +5,7 @@ metadata:
   name: kvstore-grpc
   namespace: kvstore
   annotations:
-    traefik.ingress.kubernetes.io/service.scheme: h2c
+    traefik.ingress.kubernetes.io/service.serversscheme: h2c
   labels:
     app: kvstore-grpc
 spec:
