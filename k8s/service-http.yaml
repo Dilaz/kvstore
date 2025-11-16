@@ -14,5 +14,6 @@ spec:
       targetPort: 3000
   selector:
     app: kvstore-http
-  type: ClusterPort
+  type: ClusterIP
+
 
