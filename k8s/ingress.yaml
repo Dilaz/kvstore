@@ -36,7 +36,7 @@ metadata:
     traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
 spec:
   rules:
-    - host: grpc.kvstore.binarydream.fi
+    - host: kvstore.binarydream.fi
       http:
         paths:
           - path: /
@@ -47,6 +47,6 @@ spec:
                 port:
                   number: 50051
   tls:
-    - secretName: kvstore-grpc-tls
+    - secretName: kvstore-tls
       hosts:
-        - grpc.kvstore.binarydream.fi
+        - kvstore.binarydream.fi
