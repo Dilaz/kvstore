@@ -9,7 +9,7 @@ env:
 
 jobs:
   build_and_test:
-    name: Build and test
+    name: Build, test and publish
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -47,63 +47,13 @@ jobs:
           tags: ghcr.io/dilaz/kvstore:${{ github.sha }},ghcr.io/dilaz/kvstore:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      # - name: Optimize the Docker image with Slim Toolkit
-      #   uses: kitabisa/docker-slim-action@v1
-      #   env:
-      #     DSLIM_HTTP_PROBE: false
-      #   with:
-      #     target: ghcr.io/dilaz/kvstore:${{ github.sha }}
-      #     tag: latest
-      # - name: Push Docker image
-      #   run: |
-      #     docker tag ghcr.io/dilaz/kvstore:latest ghcr.io/dilaz/kvstore:${{ github.sha }}
-      #     docker push ghcr.io/dilaz/kvstore --all-tags
-  deploy:
-    name: Deploy
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Tailscale
-        uses: tailscale/github-action@main
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-      - name: Set the Kubernetes context
-        uses: azure/k8s-set-context@v2
-        with:
-          method: service-account
-          k8s-url: ${{ secrets.KUBERNETES_HOST }}
-          k8s-secret: ${{ secrets.KUBERNETES_SECRET }}
-      - name: Checkout source code
-        uses: actions/checkout@v3
-
-      - name: Deploy to the Kubernetes cluster
-        uses: azure/k8s-deploy@v4
-        with:
-          namespace: kvstore
-          action: deploy
-          strategy: basic
-          manifests: |
-            k8s/deployment-http.yaml
-            k8s/deployment-grpc.yaml
-            k8s/service-http.yaml
-            k8s/service-grpc.yaml
-            k8s/ingress.yaml
-          images: |
-            ghcr.io/dilaz/kvstore:${{ github.sha }}
-  rollback:
-    if: failure()
-    name: Rollback
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set the Kubernetes context
-        uses: azure/k8s-set-context@v2
-        with:
-          method: service-account
-          k8s-url: ${{ secrets.KUBERNETES_HOST }}
-          k8s-secret: ${{ secrets.KUBERNETES_SECRET }}
-      - name: Rollback
+      - name: Update Kubernetes manifests
         run: |
-          kubectl rollout undo deployment kvstore-deployment -n kvstore
+          sed -i "s|image: ghcr.io/dilaz/kvstore:.*|image: ghcr.io/dilaz/kvstore:${{ github.sha }}|g" k8s/deployment-grpc.yaml
+          sed -i "s|image: ghcr.io/dilaz/kvstore:.*|image: ghcr.io/dilaz/kvstore:${{ github.sha }}|g" k8s/deployment-http.yaml
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "ci: update image tag to ${{ github.sha }}"
+          branch: master
+          file_pattern: k8s/*.yaml
