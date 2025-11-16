@@ -76,12 +76,18 @@ async fn run_grpc(
     let addr = SocketAddr::from((Ipv4Addr::UNSPECIFIED, port));
     tracing::info!("Starting gRPC server on {}", addr);
 
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter
+        .set_service_status("kvstore.KVStore", tonic_health::ServingStatus::Serving)
+        .await;
+
     let service = create_grpc_server(store);
     let reflection_service = ReflectionBuilder::configure()
         .register_encoded_file_descriptor_set(kvstore::grpc::KVSTORE_FILE_DESCRIPTOR_SET)
         .build_v1()?;
 
     Server::builder()
+        .add_service(health_service)
         .add_service(reflection_service)
         .add_service(service)
         .serve(addr)

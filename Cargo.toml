@@ -33,6 +33,7 @@ prost = "0.14.1"
 tokio-stream = { version = "0.1.17", features = ["net"] }
 tonic-prost = "0.14.2"
 tonic-reflection = "0.14.2"
+tonic-health = "0.14.2"
 
 # Redis client
 redis = { version = "0.32.7", features = ["connection-manager", "aio", "tokio-comp"] }
