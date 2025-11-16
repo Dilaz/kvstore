@@ -8,6 +8,7 @@ metadata:
     app: kvstore-grpc
 spec:
   replicas: 2
+  revisionHistoryLimit: 2
   strategy:
     type: RollingUpdate
     rollingUpdate:
