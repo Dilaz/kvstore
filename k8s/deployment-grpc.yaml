@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: kvstore-grpc
-        image: ghcr.io/dilaz/kvstore:96ca9ac0d2dd1fa86dc2b5b1cf3693bad0af5a5d
+        image: ghcr.io/dilaz/kvstore:3be24db700c1b229dd04aa0741988487dc6814f4
         imagePullPolicy: Always
         args: ["--mode=grpc"]
         securityContext:
