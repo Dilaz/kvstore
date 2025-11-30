@@ -34,11 +34,10 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.entrypoints: grpc
-    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
 spec:
   rules:
-    - host: kvstore.binarydream.fi
+    - host: grpc-kvstore.binarydream.fi
       http:
         paths:
           - path: /
@@ -49,6 +48,6 @@ spec:
                 port:
                   number: 50051
   tls:
-    - secretName: kvstore-tls
+    - secretName: kvstore-grpc-tls
       hosts:
-        - kvstore.binarydream.fi
+        - grpc-kvstore.binarydream.fi
