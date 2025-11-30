@@ -34,7 +34,7 @@ metadata:
   annotations:
     kubernetes.io/ingress.class: "traefik"
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.entrypoints: grpc
 spec:
   rules:
     - host: grpc-kvstore.binarydream.fi
