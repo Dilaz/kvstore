@@ -6,7 +6,6 @@ use crate::error::{KVStoreError, Result};
 use crate::REDIS_TOKENS_TABLE;
 use futures::StreamExt;
 use redis::{aio::ConnectionManager, AsyncCommands};
-use std::sync::Arc;
 use tokio_stream::{wrappers::ReceiverStream, Stream};
 
 /// Main KVStore struct that manages Redis connections and operations
@@ -37,7 +36,7 @@ use tokio_stream::{wrappers::ReceiverStream, Stream};
 /// ```
 #[derive(Clone)]
 pub struct KVStore {
-    conn: Arc<ConnectionManager>,
+    conn: ConnectionManager,
 }
 
 impl KVStore {
@@ -77,23 +76,19 @@ impl KVStore {
 
         tracing::info!("Successfully connected to Redis");
 
-        Ok(Self {
-            conn: Arc::new(conn),
-        })
+        Ok(Self { conn })
     }
 
     /// Create a KVStore from an existing ConnectionManager
     ///
     /// Useful for testing or when you want to manage the connection yourself.
     pub fn from_connection_manager(conn: ConnectionManager) -> Self {
-        Self {
-            conn: Arc::new(conn),
-        }
+        Self { conn }
     }
 
     /// Get a clone of the underlying connection manager
     pub fn connection_manager(&self) -> ConnectionManager {
-        (*self.conn).clone()
+        self.conn.clone()
     }
 
     /// Validate if a token exists in the tokens set
@@ -106,7 +101,7 @@ impl KVStore {
     ///
     /// `true` if the token is valid, `false` otherwise
     pub async fn validate_token(&self, token: &str) -> Result<bool> {
-        let mut conn = (*self.conn).clone();
+        let mut conn = self.conn.clone();
         let exists: bool = conn
             .sismember(REDIS_TOKENS_TABLE, token)
             .await
@@ -131,7 +126,7 @@ impl KVStore {
         let namespaced_key = format!("{}:{}", token, key);
         tracing::debug!("GET {}", namespaced_key);
 
-        let mut conn = (*self.conn).clone();
+        let mut conn = self.conn.clone();
         let value: Option<String> = conn.get(&namespaced_key).await.map_err(|e| {
             tracing::error!("Failed to get key {}: {}", namespaced_key, e);
             e
@@ -162,7 +157,7 @@ impl KVStore {
         let namespaced_key = format!("{}:{}", token, key);
         tracing::debug!("SET {} (TTL: {:?})", namespaced_key, ttl_seconds);
 
-        let mut conn = (*self.conn).clone();
+        let mut conn = self.conn.clone();
 
         if let Some(ttl) = ttl_seconds {
             conn.set_ex::<_, _, ()>(&namespaced_key, value, ttl as u64)
@@ -197,7 +192,7 @@ impl KVStore {
         let namespaced_key = format!("{}:{}", token, key);
         tracing::debug!("DELETE {}", namespaced_key);
 
-        let mut conn = (*self.conn).clone();
+        let mut conn = self.conn.clone();
         conn.del::<_, ()>(&namespaced_key).await.map_err(|e| {
             tracing::error!("Failed to delete key {}: {}", namespaced_key, e);
             e
@@ -224,7 +219,7 @@ impl KVStore {
         };
         tracing::debug!("LIST {}", pattern);
 
-        let conn = (*self.conn).clone();
+        let conn = self.conn.clone();
         let prefix_len = token.len() + 1; // +1 for the colon
 
         let (tx, rx) = tokio::sync::mpsc::channel(128);
@@ -264,7 +259,7 @@ impl KVStore {
     ///
     /// `true` if the connection is healthy, `false` otherwise
     pub async fn health_check(&self) -> Result<bool> {
-        let mut conn = (*self.conn).clone();
+        let mut conn = self.conn.clone();
         let result: String = redis::cmd("PING")
             .query_async(&mut conn)
             .await
