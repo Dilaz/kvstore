@@ -24,7 +24,7 @@ spec:
     spec:
       containers:
       - name: kvstore-http
-        image: ghcr.io/dilaz/kvstore:3be24db700c1b229dd04aa0741988487dc6814f4
+        image: ghcr.io/dilaz/kvstore:7ba54a9e766d127a6037d305df54713927dc71da
         imagePullPolicy: Always
         args: ["--mode=http"]
         securityContext:
